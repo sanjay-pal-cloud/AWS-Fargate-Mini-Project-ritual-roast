@@ -10,3 +10,6 @@ COPY . /var/www/html
 
 # Apache will run on port 80
 EXPOSE 80
+
+# Run Apache in foreground
+CMD ["apache2ctl", "-D", "FOREGROUND"]

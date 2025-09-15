@@ -26,6 +26,8 @@ $client = new SecretsManagerClient([
 $secret_name = $_ENV["SECRET_NAME"];
 $db_server = $_ENV["DB_SERVER"];
 $database_name = $_ENV["DB_DATABASE"];
+$db_user     = $_ENV["DB_USER"];
+$db_password = $_ENV["DB_PASSWORD"];
 
 
 /**
