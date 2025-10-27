@@ -1,0 +1,91 @@
+pipeline {
+    agent any
+    
+    
+    environment {
+        ECR_REPO = "340234701671.dkr.ecr.ap-south-1.amazonaws.com/ritual-roast"
+        ECS_SERVICE = "ritual-roast-service"
+        ECS_CLUSTER = "ritual-roast-cluster"
+        TASK_DEF = "ritual-roast-task"
+        IMAGE_TAG = "v1"
+    }
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/sanjay-pal-cloud/AWS-Fargate-Mini-Project-ritual-roast.git'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $ECR_REPO:$IMAGE_TAG .'
+            }
+        }
+        
+        stage('Login & Push') {
+            steps {
+                withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-creds', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+    // some block
+}
+                script {
+                    sh '''
+                    aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 340234701671.dkr.ecr.ap-south-1.amazonaws.com
+                    docker push $ECR_REPO:$IMAGE_TAG
+                    '''
+                }
+            }    
+        }
+          
+            stage('Deploy') {
+                steps {
+                  //  withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-creds', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+    // some block
+//}
+                    script {
+                        withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-creds', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+    // some block
+}
+                        sh '''
+                        
+                        # Define temporary file names
+                        CURRENT_TASK_DEF_FILE="current-task-definition.json"
+                        UPDATED_TASK_DEF_FILE="updated-task-definition.json"
+
+                        # Fetch current task definition JSON
+                        aws ecs describe-task-definition \
+                        --task-definition $TASK_DEF \
+                        --query 'taskDefinition' \
+                        --output json > $CURRENT_TASK_DEF_FILE
+
+                        echo "----- Current Task Definition -----"
+
+                        # Update container image in task definition
+                        jq --arg IMAGE "$ECR_REPO:$IMAGE_TAG" '.containerDefinitions[0].image = $IMAGE 
+                        | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+                        $CURRENT_TASK_DEF_FILE > $UPDATED_TASK_DEF_FILE
+                        
+                        echo "----- Updated Task Definition -----"
+
+                        # Register new task definition
+                        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+                        --cli-input-json "file://${UPDATED_TASK_DEF_FILE}" \
+                        --query 'taskDefinition.taskDefinitionArn' \
+                        --output text)
+
+                        echo "----- Register New Task Definition -----"  
+
+                        # Update ECS service
+                        aws ecs update-service \
+                          --cluster $ECS_CLUSTER \
+                          --service $ECS_SERVICE \
+                          --task-definition $NEW_TASK_DEF_ARN \
+                          --force-new-deployment
+                        
+                        echo "----- Updated New ECS Service -----"
+
+                        '''
+                    }
+                }
+            }
+        }
+}
